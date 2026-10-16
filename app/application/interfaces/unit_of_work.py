@@ -1,21 +1,32 @@
 from abc import ABC, abstractmethod
-from typing import Self
 
-from application.interfaces.repositories.task_repository import TaskRepository
+from application.interfaces.task_repository import TaskRepository
 
 
 class UnitOfWork(ABC):
-    tasks: TaskRepository
+    """Керує сховищами та транзакціями."""
 
-    def __enter__(self) -> Self:
+    @property
+    @abstractmethod
+    def tasks(self) -> TaskRepository:
+        """Повертає сховище завдань."""
+        ...
+
+    @abstractmethod
+    def commit(self):
+        """Підтверджує зміни."""
+        ...
+
+    @abstractmethod
+    def rollback(self):
+        """Скасовує незбережені зміни."""
+        ...
+
+    def __enter__(self):
+        """Починає роботу з одиницею збереження."""
         return self
 
-    def __exit__(self, exc_type, exc, traceback):
+    def __exit__(self, exc_type, exc_value, traceback):
+        """Відкочує транзакцію в разі помилки."""
         if exc_type is not None:
             self.rollback()
-
-    @abstractmethod
-    def commit(self): ...
-
-    @abstractmethod
-    def rollback(self): ...

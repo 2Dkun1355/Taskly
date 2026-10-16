@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Optional, Self
+from typing import Optional
 
 from domain.exceptions import ValidationException
 from domain.value_objects.base import ValueObject
@@ -8,6 +8,8 @@ from domain.value_objects.base import ValueObject
 
 @dataclass(frozen=True)
 class Schedule(ValueObject):
+    """Розклад завдання з необов'язковим часом початку та дедлайном."""
+
     start_at: Optional[datetime] = None
     end_at: Optional[datetime] = None
 
@@ -16,44 +18,26 @@ class Schedule(ValueObject):
         object.__setattr__(self, "end_at", self._to_utc(self.end_at))
         super().__post_init__()
 
-    @classmethod
-    def empty(cls) -> Self:
-        return cls()
-
-    @classmethod
-    def deadline(cls, end_at: datetime) -> Self:
-        return cls(end_at=end_at)
-
-    @classmethod
-    def interval(cls, start_at: datetime, end_at: datetime) -> Self:
-        return cls(start_at=start_at, end_at=end_at)
-
-    @property
-    def is_empty(self) -> bool:
-        return self.start_at is None and self.end_at is None
-
-    @property
-    def is_interval(self) -> bool:
-        return self.start_at is not None and self.end_at is not None
-
-    def has_ended(self, now: datetime) -> bool:
-        return self.end_at is not None and now > self.end_at
-
-    def overlaps(self, other: Self) -> bool:
-        if not (self.is_interval and other.is_interval):
-            return False
-        return self.start_at < other.end_at and other.start_at < self.end_at
-
     def _validate(self):
-        if self.start_at is not None and self.end_at is None:
-            raise ValidationException("Schedule with a start must also have an end")
-        if self.is_interval and self.start_at >= self.end_at:
-            raise ValidationException("Schedule start must be before its end")
+        """Перевіряє правильність часових меж."""
+        if (
+            self.start_at is not None
+            and self.end_at is not None
+            and self.start_at >= self.end_at
+        ):
+            raise ValidationException(
+                "Початок розкладу повинен бути раніше за дедлайн"
+            )
 
     @staticmethod
-    def _to_utc(value: Optional[datetime]) -> Optional[datetime]:
+    def _to_utc(value: Optional[datetime]):
+        """Перетворює дату в UTC."""
         if value is None:
             return None
+
         if value.tzinfo is None or value.utcoffset() is None:
-            raise ValidationException("Schedule datetimes must be timezone-aware")
+            raise ValidationException(
+                "Дати розкладу повинні містити часовий пояс"
+            )
+
         return value.astimezone(timezone.utc)

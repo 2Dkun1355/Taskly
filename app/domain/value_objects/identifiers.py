@@ -8,20 +8,28 @@ from domain.value_objects.base import ValueObject
 
 @dataclass(frozen=True)
 class EntityId(ValueObject):
+    """Унікальний ідентифікатор сутності на основі UUID."""
+
     value: str
 
-    def _validate(self) -> None:
+    def _validate(self):
         try:
             UUID(self.value)
         except (ValueError, AttributeError, TypeError):
-            raise ValidationException(f"Invalid {type(self).__name__}: {self.value!r}")
+            raise ValidationException(
+                f"Некоректний ідентифікатор {type(self).__name__}: {self.value!r}"
+            ) from None
 
     @classmethod
     def new(cls) -> Self:
+        """Створює новий ідентифікатор."""
         return cls(str(uuid4()))
 
-    def __str__(self) -> str:
+    def __str__(self):
+        """Повертає ідентифікатор у вигляді рядка."""
         return self.value
 
+
 @dataclass(frozen=True)
-class TaskId(EntityId): ...
+class TaskId(EntityId):
+    """Ідентифікатор завдання."""

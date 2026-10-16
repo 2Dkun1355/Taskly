@@ -1,30 +1,33 @@
-from dataclasses import dataclass
-from datetime import datetime, timezone
+from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Generic, TypeVar
+
 
 TId = TypeVar("TId")
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Entity(Generic[TId]):
+    """Базова сутність.
+
+    Дві сутності рівні, якщо збігаються їхній тип та ідентифікатор,
+    незалежно від значень інших полів. Час передається ззовні (через
+    параметр now), тому сутність не залежить від системного годинника.
+    """
+
     id: TId
     created_at: datetime
     updated_at: datetime
 
-    def __eq__(self, other: object) -> bool:
-        if self is other:
-            return True
-        if type(self) is not type(other):
-            return False
-        return self.id == other.id
+    def __eq__(self, other):
+        if not isinstance(other, Entity):
+            return NotImplemented
+        return type(self) is type(other) and self.id == other.id
 
-    def __hash__(self) -> int:
+    def __hash__(self):
         return hash((type(self), self.id))
 
-    @staticmethod
-    def _now() -> datetime:
-        return datetime.now(timezone.utc)
-
-    def _touch(self) -> datetime:
-        self.updated_at = self._now()
-        return self.updated_at
+    def _touch(self, now: datetime):
+        """Оновлює час останньої зміни й повертає його."""
+        self.updated_at = now
+        return now

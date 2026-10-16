@@ -1,27 +1,44 @@
 import json
-import os
 from pathlib import Path
 
 
 class JsonStorage:
-    def __init__(self, path: Path):
-        self._path = path
+    """Читає та записує JSON-дані."""
 
-    def load(self) -> dict:
-        if not self._path.exists():
-            return {"tasks": {}}
+    def __init__(self, file_path: Path | str | None = None):
+        project_root = Path(__file__).resolve().parents[3]
+        self._file_path = (
+            Path(file_path)
+            if file_path is not None
+            else project_root / "data" / "tasks.json"
+        )
 
-        with self._path.open("r", encoding="utf-8") as file:
+    def load(self) -> list[dict]:
+        """Завантажує дані з файлу."""
+        if not self._file_path.exists():
+            return []
+
+        with self._file_path.open("r", encoding="utf-8") as file:
             data = json.load(file)
 
-        data.setdefault("tasks", {})
+        if not isinstance(data, list):
+            raise ValueError("JSON-файл повинен містити список")
+
         return data
 
-    def save(self, data: dict):
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        temp_path = self._path.with_suffix(".tmp")
+    def save(self, data: list[dict]):
+        """Безпечно записує дані у файл."""
+        self._file_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = self._file_path.with_suffix(
+            self._file_path.suffix + ".tmp"
+        )
 
-        with temp_path.open("w", encoding="utf-8") as file:
-            json.dump(data, file, ensure_ascii=False, indent=2)
+        try:
+            with temporary_path.open("w", encoding="utf-8") as file:
+                json.dump(data, file, ensure_ascii=False, indent=2)
+                file.write("\n")
 
-        os.replace(temp_path, self._path)
+            temporary_path.replace(self._file_path)
+        finally:
+            if temporary_path.exists():
+                temporary_path.unlink()
