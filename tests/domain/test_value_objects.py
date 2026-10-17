@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from domain.entities.base import Entity
+from domain.enums import TaskPriority, TaskStatus
 from domain.exceptions import ValidationException
 from domain.value_objects.identifiers import EntityId, TaskId
 from domain.value_objects.schedule import Schedule
@@ -34,6 +36,24 @@ def test_title_accepts_maximum_length():
 
 def test_title_string_representation():
     assert str(Title("Завдання")) == "Завдання"
+
+
+def test_enum_labels_are_localized():
+    assert TaskPriority.HIGH.label == "високий"
+    assert TaskStatus.COMPLETED.label == "виконано"
+
+
+def test_entities_compare_by_type_and_id():
+    created = datetime(2026, 5, 1, 10, tzinfo=timezone.utc)
+    first = Entity(id="same", created_at=created, updated_at=created)
+    second = Entity(
+        id="same",
+        created_at=created + timedelta(days=1),
+        updated_at=created,
+    )
+
+    assert first == second
+    assert hash(first) == hash(second)
 
 
 def test_entity_id_generates_valid_uuid():

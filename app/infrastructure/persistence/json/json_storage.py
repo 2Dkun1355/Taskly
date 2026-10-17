@@ -6,7 +6,7 @@ class JsonStorage:
     """Читає та записує JSON-дані."""
 
     def __init__(self, file_path: Path | str | None = None):
-        project_root = Path(__file__).resolve().parents[3]
+        project_root = Path(__file__).resolve().parents[4]
         self._file_path = (
             Path(file_path)
             if file_path is not None

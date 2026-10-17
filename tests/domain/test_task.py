@@ -92,6 +92,20 @@ def test_edit_rejects_archived_task():
         )
 
 
+@pytest.mark.parametrize("description", [123, "x" * (MAX_DESCRIPTION_LENGTH + 1)])
+def test_edit_rejects_invalid_description(description):
+    task = make_task()
+
+    with pytest.raises(ValidationException):
+        task.edit(
+            title=Title("Нова назва"),
+            description=description,
+            priority=TaskPriority.LOW,
+            schedule=Schedule(),
+            now=NOW + timedelta(minutes=1),
+        )
+
+
 def test_complete_sets_status_and_completion_time():
     task = make_task()
     completed_at = NOW + timedelta(minutes=10)

@@ -1,5 +1,3 @@
-
-"""Налаштування Application."""
 from application.common import Mediator
 from application.commands import (
     CancelTaskCommand,

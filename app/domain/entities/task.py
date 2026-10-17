@@ -4,7 +4,6 @@ from typing import Optional, Self
 
 from domain.entities.base import Entity
 from domain.enums import TaskPriority, TaskStatus
-
 from domain.exceptions import InvalidTaskException, ValidationException
 from domain.value_objects.identifiers import TaskId
 from domain.value_objects.schedule import Schedule
@@ -44,7 +43,7 @@ class Task(Entity[TaskId]):
         task = cls(
             id=TaskId.new(),
             title=title,
-            description=description,
+            description=cls._normalize_description(description),
             status=TaskStatus.PLANNED,
             priority=priority,
             schedule=schedule if schedule is not None else Schedule(),
@@ -97,6 +96,7 @@ class Task(Entity[TaskId]):
         if not isinstance(schedule, Schedule):
             raise ValidationException("Некоректний розклад завдання")
 
+        description = self._normalize_description(description)
         self.title = title
         self.description = description
         self.priority = priority
@@ -114,7 +114,6 @@ class Task(Entity[TaskId]):
         self.completed_at = now
         self._touch(now)
 
-
     def mark_not_completed(self, now: datetime):
         """Позначає завдання невиконаним."""
         if not self.is_planned:
@@ -126,7 +125,6 @@ class Task(Entity[TaskId]):
         self.completed_at = None
         self._touch(now)
 
-
     def cancel(self, now: datetime):
         """Скасовує заплановане завдання."""
         if not self.is_planned:
@@ -136,7 +134,6 @@ class Task(Entity[TaskId]):
 
         self.status = TaskStatus.CANCELLED
         self._touch(now)
-
 
     def restart(self, now: datetime):
         """Повертає архівне завдання до запланованого стану."""
@@ -149,3 +146,21 @@ class Task(Entity[TaskId]):
         self.schedule = Schedule()
         self.completed_at = None
         self._touch(now)
+
+    @staticmethod
+    def _normalize_description(description: Optional[str]) -> Optional[str]:
+        """Перевіряє, очищає та нормалізує необов'язковий опис."""
+        if description is None:
+            return None
+        if not isinstance(description, str):
+            raise ValidationException("Опис завдання повинен бути рядком")
+
+        normalized = description.strip()
+        if not normalized:
+            return None
+        if len(normalized) > MAX_DESCRIPTION_LENGTH:
+            raise ValidationException(
+                "Опис завдання не може бути довшим за "
+                f"{MAX_DESCRIPTION_LENGTH} символів"
+            )
+        return normalized

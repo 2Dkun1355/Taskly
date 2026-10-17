@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+from application.bootstrap import create_mediator
 from application.commands import (
     CancelTaskCommand,
     CancelTaskHandler,
@@ -9,6 +10,8 @@ from application.commands import (
     CompleteTaskHandler,
     CreateTaskCommand,
     CreateTaskHandler,
+    DeleteTaskCommand,
+    DeleteTaskHandler,
     EditTaskCommand,
     EditTaskHandler,
     MarkTaskNotCompletedCommand,
@@ -61,6 +64,24 @@ def test_create_task_preserves_optional_fields(unit_of_work):
     task = unit_of_work.tasks.get_by_id(result.task_id)
     assert task.description == "Детальний опис"
     assert task.schedule == Schedule()
+
+
+def test_delete_task_removes_task_and_commits(unit_of_work):
+    task_id = create_task(unit_of_work)
+
+    DeleteTaskHandler(unit_of_work).execute(DeleteTaskCommand(task_id))
+
+    assert unit_of_work.tasks.get_by_id(task_id) is None
+    assert unit_of_work.commit_count == 2
+
+
+def test_bootstrap_registers_all_application_handlers(unit_of_work):
+    mediator = create_mediator(unit_of_work)
+
+    created = mediator.send(CreateTaskCommand(title="Через медіатор"))
+    listed = mediator.send(ListTasksQuery())
+
+    assert created.task_id == listed.tasks[0].id
 
 
 def test_get_task_returns_requested_task(unit_of_work_with_task, sample_task):
