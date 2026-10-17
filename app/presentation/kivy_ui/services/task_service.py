@@ -15,24 +15,25 @@ from domain.specifications.task_specifications import (
     OverdueTasks,
     PendingTasks,
     ScheduledOn,
+    ScheduledBetween,
     TitleContains,
 )
 from domain.value_objects.schedule import Schedule
 
 SECTION_TODAY = "today"
-SECTION_TOMORROW = "tomorrow"
-SECTION_LATER = "later"
+SECTION_OVERDUE = "overdue"
+SECTION_UPCOMING = "upcoming"
 SECTION_INBOX = "inbox"
 SECTION_ALL = "all"
 SECTION_ARCHIVE = "archive"
 
 # Основні розділи бічного меню, зверху вниз.
 SECTIONS = (
+    (SECTION_ALL, "Усі активні"),
     (SECTION_TODAY, "Сьогодні"),
-    (SECTION_TOMORROW, "Завтра"),
-    (SECTION_LATER, "Майбутні"),
+    (SECTION_UPCOMING, "Найближчі"),
     (SECTION_INBOX, "Без дати"),
-    (SECTION_ALL, "Усі завдання"),
+    (SECTION_OVERDUE, "Прострочені"),
 )
 
 # Архів показується окремо, в самому низу меню.
@@ -65,7 +66,7 @@ class TaskService:
         result = self._mediator.send(ListTasksQuery())
         return list(result.tasks)
 
-    def select(self, tasks, section, search=""):
+    def select(self, tasks, section, search="", archive_status="all"):
         """Відбирає й сортує завдання розділу, за потреби з пошуком за назвою."""
         belongs = self._section_filter(section)
         matches_search = (
@@ -75,7 +76,9 @@ class TaskService:
 
         selected = [
             task for task in tasks
-            if belongs(task) and matches_search(task)
+            if belongs(task)
+            and (archive_status == "all" or task.status.name.lower() == archive_status)
+            and matches_search(task)
         ]
 
         if section == SECTION_ARCHIVE:
@@ -145,29 +148,28 @@ class TaskService:
     def _section_filter(section):
         """Повертає функцію, що каже, чи належить завдання розділу.
 
-        «Сьогодні» і «Завтра» рахуються за локальною добою. «Майбутні» це
-        заплановані завдання з датою, які не припадають ні на сьогодні, ні на завтра.
+        Дати рахуються за локальною добою. «Найближчі» охоплює наступні 7 днів,
+        не включаючи сьогодні та прострочені завдання.
         """
         local_now = datetime.now().astimezone()
         today = local_now.date()
         tz = local_now.tzinfo
 
         on_today = ScheduledOn(today, tz)
-        on_tomorrow = ScheduledOn(today + timedelta(days=1), tz)
-
+        tomorrow = today + timedelta(days=1)
         if section == SECTION_TODAY:
             return (PendingTasks() & on_today).is_satisfied_by
-        if section == SECTION_TOMORROW:
-            return (PendingTasks() & on_tomorrow).is_satisfied_by
-        if section == SECTION_LATER:
-            def is_other_term(task):
-                return (
-                    task.is_planned
-                    and not task.is_in_inbox
-                    and not on_today.is_satisfied_by(task)
-                    and not on_tomorrow.is_satisfied_by(task)
-                )
-            return is_other_term
+        if section == SECTION_OVERDUE:
+            return OverdueTasks(local_now).is_satisfied_by
+        if section == SECTION_UPCOMING:
+            upcoming = ScheduledBetween(tomorrow, today + timedelta(days=7), tz)
+            overdue = OverdueTasks(local_now)
+            return lambda task: (
+                task.is_planned
+                and not task.is_in_inbox
+                and not overdue.is_satisfied_by(task)
+                and upcoming.is_satisfied_by(task)
+            )
         if section == SECTION_INBOX:
             return InboxTasks().is_satisfied_by
         if section == SECTION_ARCHIVE:
