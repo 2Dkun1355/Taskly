@@ -1,20 +1,5 @@
 from datetime import date
 
-PRIORITY_LABELS = {
-    "LOW": "Низький",
-    "MEDIUM": "Середній",
-    "HIGH": "Високий",
-}
-
-STATE_LABELS = {
-    "inbox": "Без дати",
-    "overdue": "Прострочено",
-    "planned": "Заплановано",
-    "completed": "Виконано",
-    "not_completed": "Не виконано",
-    "cancelled": "Скасовано",
-}
-
 _WEEKDAYS = (
     "Понеділок", "Вівторок", "Середа", "Четвер",
     "П'ятниця", "Субота", "Неділя",
@@ -66,5 +51,3 @@ def format_schedule(schedule):
 
     if end is not None:
         return f"До {_moment(end, today)}"
-
-    return _moment(start, today)

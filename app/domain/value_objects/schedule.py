@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 from typing import Optional
 
 from domain.exceptions import ValidationException
@@ -14,12 +14,25 @@ class Schedule(ValueObject):
     end_at: Optional[datetime] = None
 
     def __post_init__(self):
-        object.__setattr__(self, "start_at", self._to_utc(self.start_at))
-        object.__setattr__(self, "end_at", self._to_utc(self.end_at))
         super().__post_init__()
 
     def _validate(self):
         """Перевіряє правильність часових меж."""
+        for value in (self.start_at, self.end_at):
+            if value is not None and (
+                value.tzinfo is None
+                or value.utcoffset() is None
+                or value.utcoffset() != timedelta(0)
+            ):
+                raise ValidationException(
+                    "Час розкладу повинен бути в часовій зоні UTC"
+                )
+
+        if self.start_at is not None and self.end_at is None:
+            raise ValidationException(
+                "Початок розкладу повинен мати кінцевий час"
+            )
+
         if (
             self.start_at is not None
             and self.end_at is not None
@@ -28,16 +41,3 @@ class Schedule(ValueObject):
             raise ValidationException(
                 "Початок розкладу повинен бути раніше за дедлайн"
             )
-
-    @staticmethod
-    def _to_utc(value: Optional[datetime]):
-        """Перетворює дату в UTC."""
-        if value is None:
-            return None
-
-        if value.tzinfo is None or value.utcoffset() is None:
-            raise ValidationException(
-                "Дати розкладу повинні містити часовий пояс"
-            )
-
-        return value.astimezone(timezone.utc)

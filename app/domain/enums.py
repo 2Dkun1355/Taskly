@@ -35,3 +35,10 @@ class TaskStatus(StrEnum):
             TaskStatus.NOT_COMPLETED: "не виконано",
             TaskStatus.CANCELLED: "скасовано",
         }[self]
+
+
+ARCHIVED_TASK_STATUSES = frozenset({
+    TaskStatus.COMPLETED,
+    TaskStatus.NOT_COMPLETED,
+    TaskStatus.CANCELLED,
+})

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from application.commands.cancel_task import CancelTaskCommand
 from application.commands.complete_task import CompleteTaskCommand
@@ -8,50 +8,24 @@ from application.commands.edit_task import EditTaskCommand
 from application.commands.mark_task_not_completed import MarkTaskNotCompletedCommand
 from application.commands.restart_task import RestartTaskCommand
 from application.queries.list_tasks import ListTasksQuery
-from domain.enums import TaskPriority
-from domain.specifications.task_specifications import (
-    ArchivedTasks,
-    InboxTasks,
-    OverdueTasks,
-    PendingTasks,
-    ScheduledOn,
-    ScheduledBetween,
-    TitleContains,
-)
-from domain.value_objects.schedule import Schedule
+from application.queries.task_list_enums import ArchiveFilter, TaskSection
 
-SECTION_TODAY = "today"
-SECTION_OVERDUE = "overdue"
-SECTION_UPCOMING = "upcoming"
-SECTION_INBOX = "inbox"
-SECTION_ALL = "all"
-SECTION_ARCHIVE = "archive"
+SECTION_TODAY = TaskSection.TODAY
+SECTION_UPCOMING = TaskSection.UPCOMING
+SECTION_INBOX = TaskSection.INBOX
+SECTION_ALL = TaskSection.ALL
+SECTION_ARCHIVE = TaskSection.ARCHIVE
 
 # Основні розділи бічного меню, зверху вниз.
 SECTIONS = (
-    (SECTION_ALL, "Усі активні"),
-    (SECTION_TODAY, "Сьогодні"),
-    (SECTION_UPCOMING, "Найближчі"),
-    (SECTION_INBOX, "Без дати"),
-    (SECTION_OVERDUE, "Прострочені"),
+    (TaskSection.ALL, TaskSection.ALL.label),
+    (TaskSection.TODAY, TaskSection.TODAY.label),
+    (TaskSection.UPCOMING, TaskSection.UPCOMING.label),
+    (TaskSection.INBOX, TaskSection.INBOX.label),
 )
 
 # Архів показується окремо, в самому низу меню.
-ARCHIVE_SECTION = (SECTION_ARCHIVE, "Архів")
-
-_PRIORITY_RANK = {"LOW": 1, "MEDIUM": 2, "HIGH": 3}
-
-
-def _active_sort_key(task):
-    """Спершу найближчі терміни, потім вищий пріоритет, потім за назвою."""
-    due = task.schedule.end_at or task.schedule.start_at
-    return (
-        due is None,
-        due.timestamp() if due is not None else 0.0,
-        -_PRIORITY_RANK.get(task.priority.name, 0),
-        task.title.value.casefold(),
-    )
-
+ARCHIVE_SECTION = (TaskSection.ARCHIVE, TaskSection.ARCHIVE.label)
 
 class TaskService:
     """Усе, що потрібно інтерфейсу від прикладного шару."""
@@ -61,43 +35,25 @@ class TaskService:
 
     # Читання
 
-    def load_tasks(self):
-        """Завантажує всі завдання."""
-        result = self._mediator.send(ListTasksQuery())
-        return list(result.tasks)
-
-    def select(self, tasks, section, search="", archive_status="all"):
-        """Відбирає й сортує завдання розділу, за потреби з пошуком за назвою."""
-        belongs = self._section_filter(section)
-        matches_search = (
-            TitleContains(search).is_satisfied_by
-            if search.strip() else (lambda task: True)
+    def select(
+        self, section, search="", archive_filter=ArchiveFilter.ALL, min_priority=None
+    ):
+        return self._mediator.send(
+            ListTasksQuery(
+                section=TaskSection(section),
+                search=search,
+                archive_filter=ArchiveFilter(archive_filter),
+                min_priority=min_priority,
+                client_timezone=datetime.now().astimezone().tzinfo,
+            )
         )
-
-        selected = [
-            task for task in tasks
-            if belongs(task)
-            and (archive_status == "all" or task.status.name.lower() == archive_status)
-            and matches_search(task)
-        ]
-
-        if section == SECTION_ARCHIVE:
-            return sorted(selected, key=lambda task: task.updated_at, reverse=True)
-        return sorted(selected, key=_active_sort_key)
-
-    def count(self, tasks, section):
-        """Кількість завдань у розділі."""
-        belongs = self._section_filter(section)
-        return sum(1 for task in tasks if belongs(task))
 
     @staticmethod
     def state_of(task):
-        """Стан для показу: inbox, overdue, planned, completed, not_completed, cancelled."""
+        """Стан для показу: inbox, planned, completed, not_completed, cancelled."""
         if task.is_planned:
             if task.is_in_inbox:
                 return "inbox"
-            if OverdueTasks(datetime.now().astimezone()).is_satisfied_by(task):
-                return "overdue"
             return "planned"
         return task.status.name.lower()
 
@@ -108,9 +64,10 @@ class TaskService:
         return self._mediator.send(
             CreateTaskCommand(
                 title=title,
-                description=description or None,
-                priority=TaskPriority[priority],
-                schedule=Schedule(start_at=start_at, end_at=end_at),
+                description=description,
+                priority=priority,
+                start_at=start_at,
+                end_at=end_at,
             )
         )
 
@@ -120,9 +77,10 @@ class TaskService:
             EditTaskCommand(
                 task_id=task.id,
                 title=title,
-                description=description or None,
-                priority=TaskPriority[priority],
-                schedule=Schedule(start_at=start_at, end_at=end_at),
+                description=description,
+                priority=priority,
+                start_at=start_at,
+                end_at=end_at,
             )
         )
 
@@ -141,37 +99,3 @@ class TaskService:
     def delete(self, task):
         """Видаляє завдання назавжди."""
         return self._mediator.send(DeleteTaskCommand(task_id=task.id))
-
-    # Допоміжне
-
-    @staticmethod
-    def _section_filter(section):
-        """Повертає функцію, що каже, чи належить завдання розділу.
-
-        Дати рахуються за локальною добою. «Найближчі» охоплює наступні 7 днів,
-        не включаючи сьогодні та прострочені завдання.
-        """
-        local_now = datetime.now().astimezone()
-        today = local_now.date()
-        tz = local_now.tzinfo
-
-        on_today = ScheduledOn(today, tz)
-        tomorrow = today + timedelta(days=1)
-        if section == SECTION_TODAY:
-            return (PendingTasks() & on_today).is_satisfied_by
-        if section == SECTION_OVERDUE:
-            return OverdueTasks(local_now).is_satisfied_by
-        if section == SECTION_UPCOMING:
-            upcoming = ScheduledBetween(tomorrow, today + timedelta(days=7), tz)
-            overdue = OverdueTasks(local_now)
-            return lambda task: (
-                task.is_planned
-                and not task.is_in_inbox
-                and not overdue.is_satisfied_by(task)
-                and upcoming.is_satisfied_by(task)
-            )
-        if section == SECTION_INBOX:
-            return InboxTasks().is_satisfied_by
-        if section == SECTION_ARCHIVE:
-            return ArchivedTasks().is_satisfied_by
-        return PendingTasks().is_satisfied_by

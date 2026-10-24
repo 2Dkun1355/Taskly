@@ -1,7 +1,7 @@
 from datetime import date, datetime, time, timedelta, timezone, tzinfo
 
 from domain.entities.task import Task
-from domain.enums import TaskPriority
+from domain.enums import ARCHIVED_TASK_STATUSES, TaskPriority, TaskStatus
 from domain.exceptions import ValidationException
 from domain.specifications.base import Specification
 
@@ -22,9 +22,6 @@ def _schedule_intersects(task: Task, start: datetime, end: datetime) -> bool:
     if task_start is not None and task_end is not None:
         return task_start < end and task_end > start
 
-    if task_start is not None:
-        return start <= task_start < end
-
     if task_end is not None:
         return start <= task_end < end
 
@@ -36,7 +33,7 @@ class PendingTasks(Specification):
 
     def is_satisfied_by(self, task: Task) -> bool:
         """Перевіряє статус завдання."""
-        return task.is_planned
+        return task.status is TaskStatus.PLANNED
 
 
 class ArchivedTasks(Specification):
@@ -44,7 +41,18 @@ class ArchivedTasks(Specification):
 
     def is_satisfied_by(self, task: Task) -> bool:
         """Перевіряє, чи завдання перебуває в архіві."""
-        return task.is_archived
+        return task.status in ARCHIVED_TASK_STATUSES
+
+
+class TasksWithStatus(Specification):
+    """Завдання з указаним статусом."""
+
+    def __init__(self, status: TaskStatus):
+        self._status = status
+
+    def is_satisfied_by(self, task: Task) -> bool:
+        """Перевіряє статус завдання."""
+        return task.status is self._status
 
 
 class InboxTasks(Specification):
@@ -52,21 +60,10 @@ class InboxTasks(Specification):
 
     def is_satisfied_by(self, task: Task) -> bool:
         """Перевіряє, чи завдання належить до вхідних."""
-        return task.is_in_inbox
-
-
-class OverdueTasks(Specification):
-    """Заплановані завдання з минулим дедлайном."""
-
-    def __init__(self, now: datetime):
-        self._now = now
-
-    def is_satisfied_by(self, task: Task) -> bool:
-        """Перевіряє, чи минув дедлайн завдання."""
         return (
-            task.is_planned
-            and task.schedule.end_at is not None
-            and task.schedule.end_at < self._now
+            task.status is TaskStatus.PLANNED
+            and task.schedule.start_at is None
+            and task.schedule.end_at is None
         )
 
 

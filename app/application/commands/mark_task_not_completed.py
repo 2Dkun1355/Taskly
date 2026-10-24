@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from domain.exceptions import InvalidTaskException
 from domain.value_objects.identifiers import TaskId
@@ -33,7 +33,7 @@ class MarkTaskNotCompletedHandler(
         self,
         command: MarkTaskNotCompletedCommand,
     ) -> MarkTaskNotCompletedResult:
-        now = datetime.now().astimezone()
+        now = datetime.now(timezone.utc)
 
         with self._unit_of_work as uow:
             task = uow.tasks.get_by_id(command.task_id)

@@ -1,10 +1,10 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
-
 from domain.enums import TaskPriority
 from domain.exceptions import InvalidTaskException
 from domain.value_objects.identifiers import TaskId
+from domain.value_objects.description import Description
 from domain.value_objects.schedule import Schedule
 from domain.value_objects.title import Title
 from application.common import Handler
@@ -17,9 +17,10 @@ class EditTaskCommand:
 
     task_id: TaskId
     title: str
-    description: Optional[str]
-    priority: TaskPriority
-    schedule: Schedule
+    description: str
+    priority: str
+    start_at: Optional[datetime]
+    end_at: Optional[datetime]
 
 
 @dataclass(frozen=True)
@@ -36,7 +37,7 @@ class EditTaskHandler(Handler[EditTaskCommand, EditTaskResult]):
         self._unit_of_work = unit_of_work
 
     def execute(self, command: EditTaskCommand) -> EditTaskResult:
-        now = datetime.now().astimezone()
+        now = datetime.now(timezone.utc)
 
         with self._unit_of_work as uow:
             task = uow.tasks.get_by_id(command.task_id)
@@ -46,9 +47,18 @@ class EditTaskHandler(Handler[EditTaskCommand, EditTaskResult]):
 
             task.edit(
                 title=Title(command.title),
-                description=command.description,
-                priority=command.priority,
-                schedule=command.schedule,
+                description=Description(command.description),
+                priority=TaskPriority[command.priority],
+                schedule=Schedule(
+                    start_at=(
+                        command.start_at.astimezone(timezone.utc)
+                        if command.start_at is not None else None
+                    ),
+                    end_at=(
+                        command.end_at.astimezone(timezone.utc)
+                        if command.end_at is not None else None
+                    ),
+                ),
                 now=now,
             )
             uow.tasks.update(task)

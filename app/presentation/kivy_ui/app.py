@@ -6,6 +6,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.scrollview import ScrollView
 
+from application.queries.task_list_enums import ArchiveFilter
 from presentation.kivy_ui import theme
 from presentation.kivy_ui.screens.task_form import TaskForm
 from presentation.kivy_ui.screens.sidebar import Sidebar
@@ -15,7 +16,6 @@ from presentation.kivy_ui.services.task_service import (
     SECTION_ALL,
     SECTION_ARCHIVE,
     SECTION_INBOX,
-    SECTION_OVERDUE,
     SECTION_TODAY,
     SECTION_UPCOMING,
     SECTIONS,
@@ -36,7 +36,6 @@ SECTION_TITLES = dict((*SECTIONS, ARCHIVE_SECTION))
 SECTION_HINTS = {
     SECTION_ALL: "Усі активні завдання, що чекають виконання.",
     SECTION_TODAY: "Усе, що заплановано на сьогодні.",
-    SECTION_OVERDUE: "Активні завдання з минулим дедлайном.",
     SECTION_UPCOMING: "Заплановане на наступні сім днів.",
     SECTION_INBOX: "Завдання без дати. Розплануйте їх, коли буде час.",
     SECTION_ARCHIVE: "Виконані, невиконані та скасовані. Їх можна відновити.",
@@ -45,7 +44,6 @@ SECTION_HINTS = {
 EMPTY_STATES = {
     SECTION_ALL: "Активних завдань немає",
     SECTION_TODAY: "На сьогодні нічого немає",
-    SECTION_OVERDUE: "Прострочених завдань немає",
     SECTION_UPCOMING: "Найближчих завдань немає",
     SECTION_INBOX: "Завдань без дати немає",
     SECTION_ARCHIVE: "Архів порожній",
@@ -60,10 +58,9 @@ class TasklyApp(App):
     def __init__(self, mediator, **kwargs):
         super().__init__(**kwargs)
         self._service = TaskService(mediator)
-        self._tasks = []
         self._section = SECTION_ALL
         self._search = ""
-        self._archive_status = "all"
+        self._archive_filter = ArchiveFilter.ALL
         self._sidebar = None
         self._title_label = None
         self._hint_label = None
@@ -131,9 +128,11 @@ class TasklyApp(App):
         content.add_widget(search)
 
         self._archive_filters = Segmented(
-            (("all", "Усі"), ("completed", "Виконані"),
-             ("not_completed", "Не виконані"), ("cancelled", "Скасовані")),
-            "all",
+            tuple(
+                (archive_filter.value, archive_filter.label)
+                for archive_filter in ArchiveFilter
+            ),
+            ArchiveFilter.ALL.value,
         )
         self._archive_filters.height = 0
         self._archive_filters.opacity = 0
@@ -187,18 +186,18 @@ class TasklyApp(App):
     def refresh(self):
         """Перезавантажує завдання та перемальовує екран."""
         try:
-            self._tasks = self._service.load_tasks()
+            self._render()
         except Exception as error:
             show_message("Не вдалося завантажити завдання", str(error) or "Невідома помилка")
-            return
-        self._render()
 
     def _render(self):
-        counts = {
-            key: 0 if key == SECTION_ARCHIVE else self._service.count(self._tasks, key)
-            for key, _ in (*SECTIONS, ARCHIVE_SECTION)
-        }
-        self._sidebar.update(self._section, counts)
+        result = self._service.select(
+            self._section,
+            self._search,
+            self._archive_filter if self._section == SECTION_ARCHIVE
+            else ArchiveFilter.ALL,
+        )
+        self._sidebar.update(self._section, result.counts)
 
         self._title_label.text = SECTION_TITLES[self._section]
         self._hint_label.text = SECTION_HINTS[self._section]
@@ -207,14 +206,7 @@ class TasklyApp(App):
         self._archive_filters.opacity = 1 if is_archive else 0
         self._archive_filters.disabled = not is_archive
 
-        tasks = self._service.select(
-            self._tasks,
-            self._section,
-            self._search,
-            self._archive_status if is_archive else "all",
-        )
-
-        self._list.show(tasks, EMPTY_STATES[self._section], self._search)
+        self._list.show(result.tasks, EMPTY_STATES[self._section], self._search)
 
     def _select_section(self, section):
         self._section = section
@@ -225,7 +217,7 @@ class TasklyApp(App):
         self._render()
 
     def _on_archive_filter(self, _, value):
-        self._archive_status = value
+        self._archive_filter = ArchiveFilter(value)
         self._render()
 
     # Дії

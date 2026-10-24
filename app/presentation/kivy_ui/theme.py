@@ -25,7 +25,6 @@ PRIORITY_COLORS = {
 STATE_COLORS = {
     "inbox": MUTED,
     "planned": ACCENT,
-    "overdue": RED,
     "completed": GREEN,
     "not_completed": ORANGE,
     "cancelled": DIM,

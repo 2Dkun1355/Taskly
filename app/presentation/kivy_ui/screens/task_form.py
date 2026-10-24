@@ -234,7 +234,7 @@ class TaskForm(ModalCard):
     def _fill(self, task):
         """Заповнює форму даними завдання при редагуванні."""
         self._title.text = task.title.value
-        self._description.text = task.description or ""
+        self._description.text = task.description.value if task.description else ""
         self._priority.value = task.priority.name
 
         start_at, end_at = task.schedule.start_at, task.schedule.end_at

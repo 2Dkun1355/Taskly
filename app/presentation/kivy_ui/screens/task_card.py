@@ -2,8 +2,9 @@ from kivy.metrics import dp
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.widget import Widget
 
+from domain.enums import TaskStatus
 from presentation.kivy_ui import theme
-from presentation.kivy_ui.formatting import PRIORITY_LABELS, STATE_LABELS, format_schedule
+from presentation.kivy_ui.formatting import format_schedule
 from presentation.kivy_ui.widgets import Card, Chip, FlatButton, IconButton, Text
 
 
@@ -11,8 +12,10 @@ class TaskCard(Card):
     """Візуальне представлення одного завдання та його дій."""
 
     def __init__(self, task, state_of, on_edit, on_delete, on_action, **kwargs):
-        description = (task.description or "").replace("\n", " ")
-        priority = task.priority.name
+        description = (task.description.value if task.description else "").replace(
+            "\n", " "
+        )
+        priority = task.priority
 
         super().__init__(
             orientation="vertical",
@@ -21,7 +24,7 @@ class TaskCard(Card):
             padding=(dp(28), dp(12), dp(16), dp(12)),
             spacing=dp(4),
             accent_color=(
-                theme.PRIORITY_COLORS.get(priority, theme.DIM)
+                theme.PRIORITY_COLORS.get(priority.name, theme.DIM)
                 if task.is_planned else theme.DIM
             ),
             **kwargs,
@@ -40,7 +43,12 @@ class TaskCard(Card):
     def _build_header(self, task, state, priority, on_edit, on_delete):
         top = BoxLayout(size_hint_y=None, height=dp(34), spacing=dp(8))
         top.add_widget(Text(text=task.title.value, font_size="16sp", bold=True))
-        top.add_widget(Chip(text=STATE_LABELS[state], tone=theme.STATE_COLORS[state]))
+        state_label = (
+            "Без дати"
+            if state == "inbox"
+            else TaskStatus(state).label.capitalize()
+        )
+        top.add_widget(Chip(text=state_label, tone=theme.STATE_COLORS[state]))
         if task.is_planned:
             top.add_widget(self._icon_button("edit", lambda *_: on_edit(task)))
         top.add_widget(self._icon_button(
@@ -54,8 +62,8 @@ class TaskCard(Card):
             text=format_schedule(task.schedule), font_size="12sp", color=theme.MUTED,
         ))
         meta.add_widget(Text(
-            text=f"Пріоритет: {PRIORITY_LABELS.get(priority, priority).lower()}",
-            font_size="12sp", color=theme.PRIORITY_COLORS.get(priority, theme.MUTED),
+            text=f"Пріоритет: {priority.label}",
+            font_size="12sp", color=theme.PRIORITY_COLORS.get(priority.name, theme.MUTED),
             halign="right", size_hint_x=None, width=dp(170),
         ))
         self.add_widget(meta)

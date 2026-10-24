@@ -1,34 +1,26 @@
 ![Python](https://img.shields.io/badge/python-3.12+-3776AB.svg?style=flat&logo=python&logoColor=white)
+![Kivy](https://img.shields.io/badge/kivy-2.3.1-3776AB.svg?style=flat&logo=python&logoColor=white)
+![pytest](https://img.shields.io/badge/pytest-testing-0A9EDC.svg?style=flat&logo=pytest&logoColor=white)
 
 # Taskly
 
-Taskly — локальний менеджер завдань із графічним інтерфейсом на Kivy. Проєкт побудований навколо Clean Architecture: доменні правила не залежать від UI або способу збереження даних.
-
-## Можливості
-
-- створення, редагування та остаточне видалення завдань;
-- пріоритети: низький, середній і високий;
-- планування без дати, з дедлайном або з інтервалом;
-- статуси: заплановано, виконано, не виконано та скасовано;
-- відновлення архівних завдань;
-- пошук за назвою та розділи «Сьогодні», «Найближчі», «Без дати», «Прострочені»;
-- збереження у локальний JSON-файл із безпечною заміною файлу під час запису.
-
-## Вимоги
-
-- Python 3.12 або новіший;
-- залежності з `requirements.txt` (`kivy` для застосунку та `pytest` для тестів).
-
-## Встановлення та запуск
+## Встановлення
 
 ```bash
+git clone git@github.com:2Dkun1355/Taskly.git
+cd Taskly
 python -m venv .venv
-source .venv/bin/activate       # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 python -m pip install -r requirements.txt
+```
+
+## Запуск
+
+```bash
 PYTHONPATH=app python -m presentation.kivy_ui.main
 ```
 
-Файл даних за замовчуванням: `data/tasks.json`. Каталог `data/` містить runtime-дані та навмисно знаходиться поза `app/`, де зберігається лише код. Шлях можна змінити, передавши власний `JsonStorage` під час складання `JsonUnitOfWork`.
+Застосунок використовує `data/tasks.json` як файл даних за замовчуванням. Файл створюється під час першого збереження.
 
 ## Тести
 
@@ -36,28 +28,4 @@ PYTHONPATH=app python -m presentation.kivy_ui.main
 pytest
 ```
 
-Тести ізольовані від реального JSON-файлу: прикладний шар перевіряється через in-memory Unit of Work, а інфраструктура — через тимчасові каталоги.
 
-## Архітектура
-
-```text
-app/
-├── domain/          сутності, value objects, enum-и, винятки та specifications
-├── application/     команди, запити, обробники, медіатор та інтерфейси
-├── infrastructure/  JSON-сховище, репозиторій, mapper і Unit of Work
-└── presentation/    Kivy UI та сервіс, що адаптує application layer до інтерфейсу
-```
-
-Потік зміни даних: UI викликає `TaskService` → медіатор передає команду handler-у → handler змінює доменну сутність через репозиторій → Unit of Work зберігає результат у JSON.
-
-## Дані та обмеження домену
-
-- назва обов'язкова, очищається від пробілів і має не більше 128 символів;
-- опис необов'язковий, очищається від пробілів і має не більше 2000 символів;
-- дати розкладу повинні містити часовий пояс і нормалізуються до UTC;
-- завершити, скасувати або позначити завдання невиконаним можна лише зі стану «заплановано»;
-- перезапуск доступний лише для архівних завдань і очищає їхній розклад.
-
-## Структура імпортів
-
-Тести не потребують ручного встановлення `PYTHONPATH`, оскільки шлях до `app` заданий у `pytest.ini`. Для IDE достатньо позначити `app` як Sources Root або додати його до шляхів інтерпретатора.

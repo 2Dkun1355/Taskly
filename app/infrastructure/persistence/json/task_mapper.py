@@ -3,6 +3,7 @@ from datetime import datetime
 from domain.entities.task import Task
 from domain.enums import TaskPriority, TaskStatus
 from domain.value_objects.identifiers import TaskId
+from domain.value_objects.description import Description
 from domain.value_objects.schedule import Schedule
 from domain.value_objects.title import Title
 
@@ -12,7 +13,7 @@ def task_to_dict(task: Task) -> dict:
     return {
         "id": task.id.value,
         "title": task.title.value,
-        "description": task.description,
+        "description": task.description.value,
         "status": task.status.value,
         "priority": task.priority.value,
         "schedule": {
@@ -56,14 +57,14 @@ def task_from_dict(data: dict) -> Task:
     )
 
     task = Task.create(
+        id=TaskId(data["id"]),
         title=Title(data["title"]),
         now=created_at,
-        description=data["description"],
+        description=Description(data["description"] or ""),
         priority=TaskPriority(data["priority"]),
         schedule=schedule,
     )
 
-    task.id = TaskId(data["id"])
     task.status = TaskStatus(data["status"])
     task.updated_at = datetime.fromisoformat(data["updated_at"])
     task.completed_at = (

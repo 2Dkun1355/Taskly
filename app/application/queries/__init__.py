@@ -8,6 +8,7 @@ from application.queries.list_tasks import (
     ListTasksQuery,
     ListTasksResult,
 )
+from application.queries.task_list_enums import ArchiveFilter, TaskSection
 
 __all__ = [
     "GetTaskHandler",
@@ -16,4 +17,6 @@ __all__ = [
     "ListTasksHandler",
     "ListTasksQuery",
     "ListTasksResult",
+    "ArchiveFilter",
+    "TaskSection",
 ]
