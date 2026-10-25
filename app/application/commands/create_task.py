@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 from domain.entities.task import Task
@@ -37,7 +37,7 @@ class CreateTaskHandler(Handler[CreateTaskCommand, CreateTaskResult]):
         self._unit_of_work = unit_of_work
 
     def execute(self, command: CreateTaskCommand) -> CreateTaskResult:
-        now = datetime.now(timezone.utc)
+        now = datetime.now().astimezone()
         task = Task.create(
             id=TaskId.new(),
             title=Title(command.title),
@@ -46,11 +46,11 @@ class CreateTaskHandler(Handler[CreateTaskCommand, CreateTaskResult]):
             priority=TaskPriority[command.priority],
             schedule=Schedule(
                 start_at=(
-                    command.start_at.astimezone(timezone.utc)
+                    command.start_at.astimezone()
                     if command.start_at is not None else None
                 ),
                 end_at=(
-                    command.end_at.astimezone(timezone.utc)
+                    command.end_at.astimezone()
                     if command.end_at is not None else None
                 ),
             ),

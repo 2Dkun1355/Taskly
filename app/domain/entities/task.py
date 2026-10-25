@@ -53,11 +53,6 @@ class Task(Entity[TaskId]):
     def is_archived(self):
         return self.status in ARCHIVED_TASK_STATUSES
 
-    @property
-    def is_in_inbox(self):
-        return (self.is_planned and self.schedule.start_at is None
-                and self.schedule.end_at is None)
-
     def edit(self, title: Title, description: Description,
              priority: TaskPriority, schedule: Schedule, now: datetime):
         if not self.is_planned:
@@ -90,6 +85,7 @@ class Task(Entity[TaskId]):
             raise InvalidTaskException("Скасувати можна лише заплановане завдання")
 
         self.status = TaskStatus.CANCELLED
+        self.completed_at = None
         self._touch(now)
 
     def restart(self, now: datetime):

@@ -5,6 +5,7 @@ import pytest
 from application.bootstrap import create_mediator
 from application.commands import (
     CancelTaskCommand,
+    ClearArchiveCommand,
     CompleteTaskCommand,
     CreateTaskCommand,
     DeleteTaskCommand,
@@ -13,7 +14,6 @@ from application.commands import (
     RestartTaskCommand,
 )
 from application.queries import (
-    ArchiveFilter,
     GetTaskQuery,
     ListTasksQuery,
     TaskSection,
@@ -91,6 +91,20 @@ def test_restart_returns_archived_task_to_planned_without_schedule(unit_of_work)
     assert task.schedule == Schedule()
 
 
+def test_clear_archive_deletes_archived_tasks_in_one_command(unit_of_work):
+    mediator = create_mediator(unit_of_work)
+    active = mediator.send(CreateTaskCommand(title="Активна"))
+    archived = mediator.send(CreateTaskCommand(title="Архівна"))
+    mediator.send(CompleteTaskCommand(archived.task_id))
+
+    result = mediator.send(ClearArchiveCommand())
+
+    assert result.deleted_count == 1
+    assert mediator.send(GetTaskQuery(active.task_id)).task.title.value == "Активна"
+    with pytest.raises(InvalidTaskException):
+        mediator.send(GetTaskQuery(archived.task_id))
+
+
 def test_list_tasks_applies_sections_filters_and_archive_sorting(
     unit_of_work, task_factory
 ):
@@ -114,11 +128,8 @@ def test_list_tasks_applies_sections_filters_and_archive_sorting(
 
     handler = ListTasksHandler(unit_of_work)
     assert [task.title.value for task in handler.execute(
-        ListTasksQuery(section=TaskSection.INBOX)
-    ).tasks] == ["Inbox"]
-    assert [task.title.value for task in handler.execute(
         ListTasksQuery(
             section=TaskSection.ARCHIVE,
-            archive_filter=ArchiveFilter.COMPLETED,
+            status=TaskStatus.COMPLETED,
         )
     ).tasks] == ["Архів"]

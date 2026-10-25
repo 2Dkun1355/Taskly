@@ -1,298 +1,171 @@
-from math import sqrt
-
-from kivy.graphics import Color, Line, Quad, RoundedRectangle, Triangle
+from kivy.graphics import Color, Line, RoundedRectangle
 from kivy.metrics import dp
-from kivy.properties import BooleanProperty, ListProperty, NumericProperty, StringProperty
+from kivy.properties import ColorProperty, StringProperty
 from kivy.uix.behaviors import ButtonBehavior
+from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.modalview import ModalView
 from kivy.uix.textinput import TextInput
+from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.widget import Widget
 
 from presentation.kivy_ui import theme
 
 
-class Text(Label):
-    """Підпис: вирівняний ліворуч, по центру вертикально, довгий текст обрізається."""
-
+class LabelText(Label):
     def __init__(self, **kwargs):
         kwargs.setdefault("color", theme.TEXT)
         kwargs.setdefault("halign", "left")
         kwargs.setdefault("valign", "middle")
         kwargs.setdefault("shorten", True)
-        kwargs.setdefault("shorten_from", "right")
         super().__init__(**kwargs)
-        self.bind(size=self._update_text_size)
+        self.bind(size=lambda *_: setattr(self, "text_size", self.size))
 
-    def _update_text_size(self, *_):
-        self.text_size = self.size
+
+class CalendarButton(ButtonBehavior, Widget):
+    def __init__(self, **kwargs):
+        super().__init__(size_hint=(None, None), size=(dp(38), dp(38)), **kwargs)
+        with self.canvas:
+            Color(*theme.FIELD)
+            self._body = RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(6)])
+            Color(*theme.ACCENT)
+            self._outline = Line(
+                rounded_rectangle=(self.x, self.y, self.width, self.height, dp(6)),
+                width=1.2,
+            )
+            self._divider = Line(
+                points=(self.x + dp(5), self.y + dp(23), self.right - dp(5), self.y + dp(23)),
+                width=1.2,
+            )
+            self._left_ring = Line(
+                points=(self.x + dp(11), self.top, self.x + dp(11), self.top - dp(7)),
+                width=1.5,
+            )
+            self._right_ring = Line(
+                points=(self.right - dp(11), self.top, self.right - dp(11), self.top - dp(7)),
+                width=1.5,
+            )
+        self.bind(pos=self._redraw, size=self._redraw)
+
+    def _redraw(self, *_):
+        self._body.pos = self.pos
+        self._body.size = self.size
+        self._outline.rounded_rectangle = (
+            self.x, self.y, self.width, self.height, dp(6)
+        )
+        self._divider.points = (
+            self.x + dp(5), self.y + dp(23), self.right - dp(5), self.y + dp(23)
+        )
+        self._left_ring.points = (
+            self.x + dp(11), self.top, self.x + dp(11), self.top - dp(7)
+        )
+        self._right_ring.points = (
+            self.right - dp(11), self.top, self.right - dp(11), self.top - dp(7)
+        )
 
 
 class Card(BoxLayout):
-    """Контейнер із закругленим фоном і, за потреби, кольоровою смужкою зліва."""
-
-    bg_color = ListProperty(theme.SURFACE)
-    accent_color = ListProperty((0, 0, 0, 0))
-    radius = NumericProperty(0)
-
     def __init__(self, **kwargs):
-        kwargs.setdefault("radius", dp(14))
+        background = kwargs.pop("background", theme.PANEL)
         super().__init__(**kwargs)
-
         with self.canvas.before:
-            self._bg_instruction = Color(*self.bg_color)
-            self._bg_rect = RoundedRectangle(
-                pos=self.pos, size=self.size, radius=[self.radius]
-            )
-            self._accent_instruction = Color(*self.accent_color)
-            self._accent_rect = RoundedRectangle(
-                pos=self.pos, size=(0, 0), radius=[dp(2)]
-            )
-
-        self.bind(
-            pos=self._redraw,
-            size=self._redraw,
-            bg_color=self._redraw,
-            accent_color=self._redraw,
-            radius=self._redraw,
-        )
-        self._redraw()
+            self._color = Color(*background)
+            self._rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(10)])
+        self.bind(pos=self._redraw, size=self._redraw)
 
     def _redraw(self, *_):
-        self._bg_instruction.rgba = self.bg_color
-        self._bg_rect.pos = self.pos
-        self._bg_rect.size = self.size
-        self._bg_rect.radius = [self.radius]
-
-        x, y = self.pos
-        self._accent_instruction.rgba = self.accent_color
-        self._accent_rect.pos = (x + dp(10), y + dp(14))
-        self._accent_rect.size = (dp(4), max(self.height - dp(28), 0))
+        self._rect.pos = self.pos
+        self._rect.size = self.size
 
 
-class FlatButton(ButtonBehavior, Label):
-    """Пласка кнопка із закругленими кутами. bg_color це фон, color це колір тексту."""
-
-    bg_color = ListProperty(theme.SURFACE_ALT)
-    radius = NumericProperty(0)
+class UiButton(Button):
+    background = ColorProperty(theme.FIELD)
 
     def __init__(self, **kwargs):
+        kwargs.setdefault("background_normal", "")
+        kwargs.setdefault("background_down", "")
+        kwargs.setdefault("background_color", self.background)
         kwargs.setdefault("color", theme.TEXT)
         kwargs.setdefault("font_size", "13sp")
-        kwargs.setdefault("radius", dp(10))
         super().__init__(**kwargs)
+        self.bind(background=self._sync)
 
-        with self.canvas.before:
-            self._bg_instruction = Color(*self.bg_color)
-            self._bg_rect = RoundedRectangle(
-                pos=self.pos, size=self.size, radius=[self.radius]
+    def _sync(self, *_):
+        self.background_color = self.background
+
+
+class ChoiceBar(BoxLayout):
+    value = StringProperty("")
+
+    def __init__(self, options, value, on_change=None, **kwargs):
+        super().__init__(size_hint_y=None, height=dp(34), spacing=dp(5), **kwargs)
+        self.value = value
+        self._buttons = {}
+        self._on_change = on_change
+        for key, label in options:
+            button = ToggleButton(
+                text=label,
+                group=f"choice-{id(self)}",
+                state="down" if key == value else "normal",
+                background_normal="",
+                background_down="",
+                background_color=theme.FIELD,
+                color=theme.MUTED,
+                font_size="12sp",
             )
+            button.bind(state=lambda instance, state, chosen=key: self._changed(chosen, state))
+            self._buttons[key] = button
+            self.add_widget(button)
+        self._set_active_colors(value)
 
-        self.bind(
-            pos=self._redraw,
-            size=self._redraw,
-            bg_color=self._redraw,
-            state=self._redraw,
-            radius=self._redraw,
-        )
-        self._redraw()
+    def _changed(self, key, state):
+        if state != "down":
+            return
+        self.value = key
+        self._set_active_colors(key)
+        if self._on_change is not None:
+            self._on_change(key)
 
-    def _redraw(self, *_):
-        red, green, blue, alpha = self.bg_color
-        if self.state == "down":
-            # Під час натискання фон трохи світлішає.
-            red, green, blue = (min(channel + 0.08, 1) for channel in (red, green, blue))
+    def _set_active_colors(self, key):
+        for name, button in self._buttons.items():
+            button.background_color = theme.ACCENT if name == key else theme.FIELD
+            button.color = theme.TEXT if name == key else theme.MUTED
 
-        self._bg_instruction.rgba = (red, green, blue, alpha)
-        self._bg_rect.pos = self.pos
-        self._bg_rect.size = self.size
-        self._bg_rect.radius = [self.radius]
+    def set_enabled(self, enabled):
+        self.disabled = not enabled
+        for button in self._buttons.values():
+            button.disabled = not enabled
 
 
-class IconButton(ButtonBehavior, Widget):
-    """Невелика кнопка-піктограма без фону: «edit» (олівець) або «delete» (урна).
-
-    У спокої піктограма приглушена, а при натисканні підсвічується кольором press_tone.
-    """
-
-    icon = StringProperty("edit")
-    tone = ListProperty(theme.MUTED)
-    press_tone = ListProperty(theme.TEXT)
-
+class SearchField(TextInput):
     def __init__(self, **kwargs):
-        kwargs.setdefault("size_hint", (None, None))
-        kwargs.setdefault("size", (dp(30), dp(30)))
+        kwargs.setdefault("multiline", False)
+        kwargs.setdefault("hint_text_color", theme.DIM)
+        kwargs.setdefault("foreground_color", theme.TEXT)
+        kwargs.setdefault("cursor_color", theme.ACCENT)
+        kwargs.setdefault("background_normal", "")
+        kwargs.setdefault("background_active", "")
+        kwargs.setdefault("background_color", theme.FIELD)
+        kwargs.setdefault("padding", (dp(12), dp(10)))
+        kwargs.setdefault("font_size", "14sp")
         super().__init__(**kwargs)
 
-        self.bind(
-            pos=self._redraw,
-            size=self._redraw,
-            state=self._redraw,
-            icon=self._redraw,
-            tone=self._redraw,
-            press_tone=self._redraw,
+
+class ScheduleField(BoxLayout):
+    """Поле локальної дати й часу для форми задачі."""
+
+    def __init__(self, label, value=None, **kwargs):
+        super().__init__(size_hint_y=None, height=dp(42), spacing=dp(6), **kwargs)
+        local = value.astimezone() if value else None
+        self.input = SearchField(
+            text=local.strftime("%d.%m.%Y %H:%M") if local else "",
+            hint_text=f"{label}: дд.мм.рррр гг:хх",
+            size_hint_y=None,
+            height=dp(42),
+            font_size="12sp",
         )
-        self._redraw()
-
-    def _redraw(self, *_):
-        self.canvas.clear()
-
-        pressed = self.state == "down"
-        center_x, center_y = self.center
-
-        with self.canvas:
-            if pressed:
-                # Ледь помітна підсвітка під час натискання.
-                Color(1, 1, 1, 0.08)
-                RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(8)])
-
-            Color(*(self.press_tone if pressed else self.tone))
-            if self.icon == "delete":
-                self._draw_trash(center_x, center_y)
-            else:
-                self._draw_pencil(center_x, center_y)
-
-    @staticmethod
-    def _draw_pencil(cx, cy):
-        """Контурний олівець, нахилений угору вправо."""
-        unit = dp(1)
-        k = sqrt(0.5)
-        half = 2.4
-
-        def point(along, across):
-            # along: вздовж олівця, across: упоперек (в одиницях unit).
-            return (
-                cx + (k * along - k * across) * unit,
-                cy + (k * along + k * across) * unit,
-            )
-
-        Line(
-            points=[
-                *point(8, half),
-                *point(8, -half),
-                *point(-3, -half),
-                *point(-9, 0),
-                *point(-3, half),
-            ],
-            width=dp(1.3),
-            joint="round",
-            close=True,
-        )
-        Line(
-            points=[*point(-3, half), *point(-3, -half)],
-            width=dp(1.3),
-            cap="round",
-        )
-
-    @staticmethod
-    def _draw_trash(cx, cy):
-        """Контурна урна з кришкою, ручкою та двома смужками."""
-        unit = dp(1)
-        width = dp(1.3)
-
-        # Кришка і її ручка.
-        Line(
-            points=[cx - 7 * unit, cy + 5 * unit, cx + 7 * unit, cy + 5 * unit],
-            width=width,
-            cap="round",
-        )
-        Line(
-            points=[
-                cx - 2.5 * unit, cy + 5 * unit,
-                cx - 2.5 * unit, cy + 8 * unit,
-                cx + 2.5 * unit, cy + 8 * unit,
-                cx + 2.5 * unit, cy + 5 * unit,
-            ],
-            width=width,
-            joint="round",
-        )
-        # Корпус.
-        Line(
-            points=[
-                cx - 5.5 * unit, cy + 5 * unit,
-                cx - 4.5 * unit, cy - 8 * unit,
-                cx + 4.5 * unit, cy - 8 * unit,
-                cx + 5.5 * unit, cy + 5 * unit,
-            ],
-            width=width,
-            joint="round",
-        )
-        # Смужки.
-        for offset in (-1.8, 1.8):
-            Line(
-                points=[cx + offset * unit, cy + 2 * unit, cx + offset * unit, cy - 5 * unit],
-                width=width,
-                cap="round",
-            )
-
-
-class Chip(Label):
-    """Невелика кольорова позначка, наприклад статус завдання."""
-
-    tone = ListProperty(theme.ACCENT)
-
-    def __init__(self, **kwargs):
-        kwargs.setdefault("font_size", "11sp")
-        kwargs.setdefault("bold", True)
-        kwargs.setdefault("size_hint", (None, None))
-        kwargs.setdefault("height", dp(22))
-        kwargs.setdefault("pos_hint", {"center_y": 0.5})
-        super().__init__(**kwargs)
-
-        with self.canvas.before:
-            self._bg_instruction = Color(0, 0, 0, 0)
-            self._bg_rect = RoundedRectangle(
-                pos=self.pos, size=self.size, radius=[dp(11)]
-            )
-
-        self.bind(
-            pos=self._redraw,
-            size=self._redraw,
-            tone=self._redraw,
-            texture_size=self._fit,
-        )
-        self._fit()
-        self._redraw()
-
-    def _fit(self, *_):
-        self.width = self.texture_size[0] + dp(20)
-
-    def _redraw(self, *_):
-        red, green, blue, _alpha = self.tone
-        self.color = (red, green, blue, 1)
-        self._bg_instruction.rgba = (red, green, blue, 0.18)
-        self._bg_rect.pos = self.pos
-        self._bg_rect.size = self.size
-
-
-class Field(Card):
-    """Поле введення із закругленим фоном. Текст доступний через властивість text."""
-
-    def __init__(self, text="", hint="", multiline=False, height=44, **kwargs):
-        kwargs.setdefault("size_hint_y", None)
-        super().__init__(
-            bg_color=theme.FIELD,
-            radius=dp(10),
-            height=dp(height),
-            **kwargs,
-        )
-
-        self.input = TextInput(
-            text=text,
-            hint_text=hint,
-            multiline=multiline,
-            background_normal="",
-            background_active="",
-            background_disabled_normal="",
-            background_color=(0, 0, 0, 0),
-            foreground_color=theme.TEXT,
-            hint_text_color=theme.DIM,
-            cursor_color=theme.ACCENT,
-            padding=(dp(10), dp(12), dp(10), dp(12)),
-            font_size="14sp",
-        )
-        self.input.bind(focus=self._on_focus)
         self.add_widget(self.input)
 
     @property
@@ -303,197 +176,64 @@ class Field(Card):
     def text(self, value):
         self.input.text = value
 
-    def _on_focus(self, _, focused):
-        self.bg_color = theme.FIELD_FOCUS if focused else theme.FIELD
+    def set_enabled(self, enabled):
+        self.disabled = not enabled
+        self.input.disabled = not enabled
+        self.input.foreground_color = theme.TEXT if enabled else theme.DIM
+        self.input.background_color = theme.FIELD if enabled else theme.PANEL
 
 
-class NavItem(ButtonBehavior, BoxLayout):
-    """Пункт бічного меню з лічильником справа."""
-
-    selected = BooleanProperty(False)
-
-    def __init__(self, text, **kwargs):
-        super().__init__(
-            orientation="horizontal",
-            size_hint_y=None,
-            height=dp(42),
-            padding=(dp(14), 0, dp(12), 0),
-            spacing=dp(8),
-            **kwargs,
-        )
-
-        self._title = Text(text=text, font_size="14sp", color=theme.MUTED)
-        self._count = Text(
-            text="",
-            font_size="12sp",
-            bold=True,
-            halign="right",
-            size_hint_x=None,
-            width=dp(34),
-            color=theme.MUTED,
-        )
-        self.add_widget(self._title)
-        self.add_widget(self._count)
-
-        with self.canvas.before:
-            self._bg_instruction = Color(0, 0, 0, 0)
-            self._bg_rect = RoundedRectangle(
-                pos=self.pos, size=self.size, radius=[dp(10)]
-            )
-
-        self.bind(
-            pos=self._redraw,
-            size=self._redraw,
-            selected=self._redraw,
-            state=self._redraw,
-        )
-        self._redraw()
-
-    def set_count(self, count, alert=False):
-        """Показує кількість завдань; нуль не показується."""
-        self._count.text = str(count) if count else ""
-        self._count.color = theme.RED if (alert and count) else theme.MUTED
-
-    def _redraw(self, *_):
-        if self.selected:
-            rgba = (*theme.ACCENT[:3], 0.22)
-        elif self.state == "down":
-            rgba = (1, 1, 1, 0.06)
-        else:
-            rgba = (0, 0, 0, 0)
-
-        self._bg_instruction.rgba = rgba
-        self._bg_rect.pos = self.pos
-        self._bg_rect.size = self.size
-        self._title.color = theme.TEXT if self.selected else theme.MUTED
-        self._title.bold = self.selected
-
-
-class Segmented(BoxLayout):
-    """Перемикач із кількох варіантів. Обраний ключ лежить у властивості value."""
-
-    value = StringProperty("")
-
-    def __init__(self, options, value, **kwargs):
-        super().__init__(
-            size_hint_y=None,
-            height=dp(40),
-            spacing=dp(6),
-            **kwargs,
-        )
-        self._buttons = {}
-
-        for key, label in options:
-            button = FlatButton(text=label)
-            button.bind(
-                on_release=lambda _, chosen=key: setattr(self, "value", chosen)
-            )
-            self._buttons[key] = button
-            self.add_widget(button)
-
-        self.bind(value=self._refresh)
-        self.value = value
-        self._refresh()
-
-    def _refresh(self, *_):
-        for key, button in self._buttons.items():
-            selected = key == self.value
-            button.bg_color = theme.ACCENT if selected else theme.FIELD
-            button.color = theme.TEXT if selected else theme.MUTED
-
-
-class ModalCard(ModalView):
-    """Вікно-картка поверх застосунку: заголовок і порожня область body для вмісту."""
-
-    def __init__(self, title, width=460, height=260, **kwargs):
-        from kivy.core.window import Window
-
-        kwargs.setdefault("auto_dismiss", True)
+class Modal(ModalView):
+    def __init__(self, title, **kwargs):
+        kwargs.setdefault("size", (dp(500), dp(460)))
         super().__init__(
             size_hint=(None, None),
-            size=(
-                min(dp(width), Window.width * 0.94),
-                min(dp(height), Window.height * 0.94),
-            ),
-            background="",
-            background_color=(0, 0, 0, 0),
-            overlay_color=(0, 0, 0, 0.6),
+            background_color=(0, 0, 0, 0.65),
+            auto_dismiss=False,
             **kwargs,
         )
-
-        card = Card(
+        panel = BoxLayout(
             orientation="vertical",
-            bg_color=theme.SURFACE,
-            padding=dp(22),
-            spacing=dp(14),
+            padding=(dp(22), dp(12), dp(22), dp(18)),
+            spacing=dp(12),
         )
-        card.add_widget(
-            Text(
-                text=title,
-                font_size="19sp",
-                bold=True,
-                size_hint_y=None,
-                height=dp(30),
-            )
-        )
+        with panel.canvas.before:
+            self._body_color = Color(*theme.PANEL)
+            self._body_rect = RoundedRectangle(pos=panel.pos, size=panel.size, radius=[dp(12)])
+        panel.bind(pos=self._redraw_body, size=self._redraw_body)
+        panel.add_widget(LabelText(text=title, font_size="20sp", bold=True, size_hint_y=None, height=dp(32)))
 
-        self.body = BoxLayout(orientation="vertical", spacing=dp(12))
-        card.add_widget(self.body)
-        self.add_widget(card)
+        content_anchor = AnchorLayout(anchor_y="top")
+        content = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(12))
+        content.bind(minimum_height=content.setter("height"))
+        content_anchor.add_widget(content)
+        panel.add_widget(content_anchor)
+        self.body = content
+        self.footer = BoxLayout(size_hint_y=None, height=dp(42), spacing=dp(8))
+        panel.add_widget(self.footer)
+        self.add_widget(panel)
+
+    def _redraw_body(self, panel, *_):
+        self._body_rect.pos = panel.pos
+        self._body_rect.size = panel.size
 
 
-def show_message(title, text):
-    """Показує повідомлення з кнопкою «Закрити»."""
-    modal = ModalCard(title, height=230)
-    modal.body.add_widget(
-        Text(
-            text=text,
-            font_size="14sp",
-            color=theme.MUTED,
-            shorten=False,
-            valign="top",
-        )
-    )
-
-    close = FlatButton(
-        text="Закрити",
-        bg_color=theme.ACCENT,
-        size_hint_y=None,
-        height=dp(42),
-    )
+def message(title, text):
+    modal = Modal(title, size=(dp(460), dp(260)))
+    modal.body.add_widget(LabelText(text=text, color=theme.MUTED, shorten=False))
+    close = UiButton(text="Закрити", background=theme.ACCENT, size_hint_y=None, height=dp(40))
     close.bind(on_release=lambda *_: modal.dismiss())
-    modal.body.add_widget(close)
+    modal.footer.add_widget(close)
     modal.open()
 
 
-def confirm(title, text, confirm_text, on_confirm, danger=False):
-    """Просить підтвердити дію; on_confirm викликається лише після згоди."""
-    modal = ModalCard(title, height=230)
-    modal.body.add_widget(
-        Text(
-            text=text,
-            font_size="14sp",
-            color=theme.MUTED,
-            shorten=False,
-            valign="top",
-        )
-    )
-
-    row = BoxLayout(size_hint_y=None, height=dp(42), spacing=dp(10))
-    back = FlatButton(text="Назад", bg_color=theme.SURFACE_ALT)
-    accept = FlatButton(
-        text=confirm_text,
-        bg_color=theme.RED if danger else theme.ACCENT,
-        bold=True,
-    )
-
-    def on_accept(*_):
-        modal.dismiss()
-        on_confirm()
-
+def confirm(title, text, action_text, action, danger=False):
+    modal = Modal(title, size=(dp(460), dp(260)))
+    modal.body.add_widget(LabelText(text=text, color=theme.MUTED, shorten=False))
+    back = UiButton(text="Назад")
+    accept = UiButton(text=action_text, background=theme.RED if danger else theme.ACCENT)
     back.bind(on_release=lambda *_: modal.dismiss())
-    accept.bind(on_release=on_accept)
-    row.add_widget(back)
-    row.add_widget(accept)
-    modal.body.add_widget(row)
+    accept.bind(on_release=lambda *_: (modal.dismiss(), action()))
+    modal.footer.add_widget(back)
+    modal.footer.add_widget(accept)
     modal.open()

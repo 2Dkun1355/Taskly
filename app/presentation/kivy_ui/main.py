@@ -4,8 +4,7 @@ from presentation.kivy_ui.app import TasklyApp
 
 
 def main():
-    mediator = create_mediator(JsonUnitOfWork())
-    TasklyApp(mediator).run()
+    TasklyApp(create_mediator(JsonUnitOfWork())).run()
 
 
 if __name__ == "__main__":

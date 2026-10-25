@@ -8,7 +8,7 @@ from domain.value_objects.description import Description
 from domain.value_objects.identifiers import TaskId
 from domain.value_objects.schedule import Schedule
 from domain.value_objects.title import Title
-from application.interfaces import TaskRepository, UnitOfWork
+from application.interfaces import TaskRepository, TaskSearchCriteria, UnitOfWork
 
 
 NOW = datetime(2026, 1, 15, 12, tzinfo=timezone.utc)
@@ -68,8 +68,37 @@ class InMemoryTaskRepository(TaskRepository):
     def get_by_id(self, task_id):
         return self._tasks.get(task_id.value)
 
-    def get_all(self):
-        return list(self._tasks.values())
+    def search(self, criteria: TaskSearchCriteria):
+        return [
+            task for task in self._tasks.values()
+            if task.status in criteria.statuses
+            and (
+                criteria.priority is None
+                or task.priority is criteria.priority
+            )
+            and (
+                criteria.scheduled_on is None
+                or any(
+                    value is not None
+                    and value.date() == criteria.scheduled_on
+                    for value in (
+                        task.schedule.start_at,
+                        task.schedule.end_at,
+                    )
+                )
+            )
+            and (
+                criteria.scheduled_after is None
+                or any(
+                    value is not None
+                    and value.date() > criteria.scheduled_after
+                    for value in (
+                        task.schedule.start_at,
+                        task.schedule.end_at,
+                    )
+                )
+            )
+        ]
 
     def add(self, task):
         if task.id.value in self._tasks:
@@ -85,6 +114,15 @@ class InMemoryTaskRepository(TaskRepository):
         if task_id.value not in self._tasks:
             raise ValueError("Завдання не знайдено")
         del self._tasks[task_id.value]
+
+    def delete_archived(self):
+        archived_ids = [
+            task_id for task_id, task in self._tasks.items()
+            if task.is_archived
+        ]
+        for task_id in archived_ids:
+            del self._tasks[task_id]
+        return len(archived_ids)
 
 
 class InMemoryUnitOfWork(UnitOfWork):

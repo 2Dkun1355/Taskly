@@ -1,39 +1,32 @@
-from datetime import datetime, timedelta, timezone
-
 from application.queries import ListTasksQuery, TaskSection
-from application.queries.list_tasks import TaskListSpecificationFactory
-from domain.enums import TaskPriority
-from domain.value_objects.schedule import Schedule
+from application.queries.list_tasks import ListTasksHandler
+from domain.enums import TaskPriority, TaskStatus
 
 
-def test_active_query_supports_search_and_priority(task_factory):
+def test_active_query_supports_priority():
     command = ListTasksQuery(
-        section=TaskSection.ALL,
-        search="важлива",
-        min_priority="HIGH",
-    )
-    specification = TaskListSpecificationFactory.create(command)
-    matching = task_factory(
-        title="Важлива задача",
+        section=TaskSection.ALL_ACTIVE,
         priority=TaskPriority.HIGH,
     )
-    non_matching = task_factory(2, title="Інша задача")
+    criteria = ListTasksHandler.build_search_criteria(command)
 
-    assert specification.is_satisfied_by(matching)
-    assert not specification.is_satisfied_by(non_matching)
+    assert criteria.priority is TaskPriority.HIGH
 
 
-def test_upcoming_specification_excludes_inbox(task_factory):
+def test_upcoming_criteria_excludes_inbox():
     command = ListTasksQuery(section=TaskSection.UPCOMING)
-    specification = TaskListSpecificationFactory.create(command)
+    criteria = ListTasksHandler.build_search_criteria(command)
 
-    inbox = task_factory()
-    scheduled = task_factory(
-        2,
-        schedule=Schedule(
-            end_at=datetime.now(timezone.utc) + timedelta(days=2)
-        ),
+    assert criteria.scheduled_after is not None
+    assert criteria.statuses == frozenset({TaskStatus.PLANNED})
+
+
+def test_archive_filter_is_ignored_for_active_sections(task_factory):
+    criteria = ListTasksHandler.build_search_criteria(
+        ListTasksQuery(
+            section=TaskSection.ALL_ACTIVE,
+            status=TaskStatus.COMPLETED,
+        )
     )
 
-    assert not specification.is_satisfied_by(inbox)
-    assert specification.is_satisfied_by(scheduled)
+    assert criteria.statuses == frozenset({TaskStatus.PLANNED})

@@ -3,6 +3,11 @@ from application.commands.cancel_task import (
     CancelTaskHandler,
     CancelTaskResult,
 )
+from application.commands.clear_archive import (
+    ClearArchiveCommand,
+    ClearArchiveHandler,
+    ClearArchiveResult,
+)
 from application.commands.complete_task import (
     CompleteTaskCommand,
     CompleteTaskHandler,
@@ -35,6 +40,9 @@ from application.commands.restart_task import (
 )
 
 __all__ = [
+    "ClearArchiveCommand",
+    "ClearArchiveHandler",
+    "ClearArchiveResult",
     "DeleteTaskCommand",
     "DeleteTaskHandler",
     "CancelTaskCommand",

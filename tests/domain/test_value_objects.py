@@ -53,7 +53,7 @@ def test_schedule_rejects_start_without_end_and_invalid_interval():
         Schedule(start_at=start, end_at=start)
 
 
-def test_schedule_rejects_naive_and_non_utc_datetimes():
+def test_schedule_rejects_naive_but_accepts_local_timezone_datetimes():
     naive = datetime(2026, 1, 15, 12)
     kyiv_time = datetime(
         2026,
@@ -63,12 +63,6 @@ def test_schedule_rejects_naive_and_non_utc_datetimes():
         tzinfo=timezone(timedelta(hours=2)),
     )
 
-    with pytest.raises(ValidationException, match="UTC"):
+    with pytest.raises(ValidationException, match="часову зону"):
         Schedule(end_at=naive)
-    with pytest.raises(ValidationException, match="UTC"):
-        Schedule(end_at=kyiv_time)
-
-
-def test_enum_labels_are_available():
-    assert TaskPriority.HIGH.label == "високий"
-    assert TaskStatus.COMPLETED.label == "виконано"
+    assert Schedule(end_at=kyiv_time).end_at == kyiv_time

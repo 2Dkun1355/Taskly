@@ -26,4 +26,3 @@ class Entity(Generic[TId]):
     def _touch(self, now: datetime):
         """Оновлює час останньої зміни."""
         self.updated_at = now
-        return now

@@ -11,7 +11,6 @@ from domain.value_objects.title import Title
 def test_create_uses_ready_value_objects(sample_task):
     assert sample_task.status is TaskStatus.PLANNED
     assert sample_task.is_planned
-    assert sample_task.is_in_inbox
 
 
 def test_entity_equality_and_hash_use_type_and_id(sample_task, task_factory):

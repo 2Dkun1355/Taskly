@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 from domain.enums import TaskPriority
 from domain.exceptions import InvalidTaskException
@@ -37,7 +37,7 @@ class EditTaskHandler(Handler[EditTaskCommand, EditTaskResult]):
         self._unit_of_work = unit_of_work
 
     def execute(self, command: EditTaskCommand) -> EditTaskResult:
-        now = datetime.now(timezone.utc)
+        now = datetime.now().astimezone()
 
         with self._unit_of_work as uow:
             task = uow.tasks.get_by_id(command.task_id)
@@ -51,11 +51,11 @@ class EditTaskHandler(Handler[EditTaskCommand, EditTaskResult]):
                 priority=TaskPriority[command.priority],
                 schedule=Schedule(
                     start_at=(
-                        command.start_at.astimezone(timezone.utc)
+                        command.start_at.astimezone()
                         if command.start_at is not None else None
                     ),
                     end_at=(
-                        command.end_at.astimezone(timezone.utc)
+                        command.end_at.astimezone()
                         if command.end_at is not None else None
                     ),
                 ),

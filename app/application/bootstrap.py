@@ -2,6 +2,8 @@ from application.common import Mediator
 from application.commands import (
     CancelTaskCommand,
     CancelTaskHandler,
+    ClearArchiveCommand,
+    ClearArchiveHandler,
     CompleteTaskCommand,
     CompleteTaskHandler,
     CreateTaskCommand,
@@ -28,16 +30,18 @@ def create_mediator(unit_of_work: UnitOfWork) -> Mediator:
     """Створює медіатор із зареєстрованими обробниками."""
     mediator = Mediator()
 
+    list_tasks_handler = ListTasksHandler(unit_of_work)
     handlers = {
         CreateTaskCommand: CreateTaskHandler(unit_of_work),
         EditTaskCommand: EditTaskHandler(unit_of_work),
         DeleteTaskCommand: DeleteTaskHandler(unit_of_work),
         CompleteTaskCommand: CompleteTaskHandler(unit_of_work),
         CancelTaskCommand: CancelTaskHandler(unit_of_work),
+        ClearArchiveCommand: ClearArchiveHandler(unit_of_work),
         RestartTaskCommand: RestartTaskHandler(unit_of_work),
         MarkTaskNotCompletedCommand: MarkTaskNotCompletedHandler(unit_of_work),
         GetTaskQuery: GetTaskHandler(unit_of_work),
-        ListTasksQuery: ListTasksHandler(unit_of_work),
+        ListTasksQuery: list_tasks_handler,
     }
 
     for message_type, handler in handlers.items():

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 
 from domain.exceptions import InvalidTaskException
 from domain.value_objects.identifiers import TaskId
@@ -28,7 +28,7 @@ class RestartTaskHandler(Handler[RestartTaskCommand, RestartTaskResult]):
         self._unit_of_work = unit_of_work
 
     def execute(self, command: RestartTaskCommand) -> RestartTaskResult:
-        now = datetime.now(timezone.utc)
+        now = datetime.now().astimezone()
 
         with self._unit_of_work as uow:
             task = uow.tasks.get_by_id(command.task_id)

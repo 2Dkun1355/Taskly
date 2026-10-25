@@ -1,8 +1,21 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from datetime import date
 from typing import Optional
 
 from domain.entities.task import Task
+from domain.enums import TaskPriority, TaskStatus
 from domain.value_objects.identifiers import TaskId
+
+
+@dataclass(frozen=True)
+class TaskSearchCriteria:
+    """Параметри пошуку без прив'язки до конкретного сховища."""
+
+    statuses: frozenset[TaskStatus]
+    priority: Optional[TaskPriority] = None
+    scheduled_on: Optional[date] = None
+    scheduled_after: Optional[date] = None
 
 
 class TaskRepository(ABC):
@@ -14,8 +27,8 @@ class TaskRepository(ABC):
         ...
 
     @abstractmethod
-    def get_all(self) -> list[Task]:
-        """Повертає всі завдання."""
+    def search(self, criteria: TaskSearchCriteria) -> list[Task]:
+        """Повертає завдання відповідно до критеріїв пошуку."""
         ...
 
     @abstractmethod
@@ -31,4 +44,9 @@ class TaskRepository(ABC):
     @abstractmethod
     def delete(self, task_id: TaskId):
         """Видаляє завдання зі сховища."""
+        ...
+
+    @abstractmethod
+    def delete_archived(self) -> int:
+        """Видаляє архівні завдання та повертає їх кількість."""
         ...
